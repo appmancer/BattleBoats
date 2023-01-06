@@ -421,7 +421,7 @@ void placeShip(String[] board, int pos, int length, String orientation)
     }
     else //vertical
     {
-        inc = 8;
+        inc = Width;
     }
 
     for(int i =0; i< length; i++)
