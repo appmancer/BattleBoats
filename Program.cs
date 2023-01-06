@@ -15,7 +15,7 @@
 using System.Text;
 
 //Map constants
-const String Water = "~";
+const String Water = "~ ";
 const String Ship = "=";
 const String Miss = "o";
 const String Hit = "*";
