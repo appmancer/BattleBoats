@@ -1,5 +1,5 @@
 ﻿
-/* BattleBoat
+/*
 ██████╗  █████╗ ████████╗████████╗██╗     ███████╗    ██████╗  ██████╗  █████╗ ████████╗
 ██╔══██╗██╔══██╗╚══██╔══╝╚══██╔══╝██║     ██╔════╝    ██╔══██╗██╔═══██╗██╔══██╗╚══██╔══╝
 ██████╔╝███████║   ██║      ██║   ██║     █████╗      ██████╔╝██║   ██║███████║   ██║   
@@ -35,6 +35,9 @@ const String Orientations = "VH";
 const int Height = 8;
 const int Width = 8;
 
+//Menu constants
+const String MenuOptions = "SLQD";
+
 //Ship constants
 const int Destroyer = 3;
 const int Submarine = 2;
@@ -61,6 +64,11 @@ const String ClearText = "                                        ";
 const String PlayerWinsText = "Congratulations, you are the winner";
 const String ComputerWinsText = "What!  You let the random computer win?";
 const String SaveGameFilename = "SaveGame.txt";
+const String MenuTitleText = "Select an option from the menu";
+const String NewGameText = "S - start a new game";
+const String LoadGameText = "L - load game";
+const String QuitText = "Q - quit";
+const String DebugModeText = "Debug mode enabled";
 
 //Save game constants
 const String shipSplitter = "+";
@@ -85,6 +93,8 @@ String[] ShipNames = new String[] {"Destroyer", "Submarine", "Submarine", "Friga
 int CurrentPlayer = Player;
 int Winner = NoWinner;
 
+//Debug mode.  If mode is true, show the defender's defence board as well
+bool Debug = false;
 
 //First game - User places their ships
 void placePlayerShips()
@@ -96,6 +106,7 @@ void placePlayerShips()
     {
         //Draw the board
         drawBoard(44, 7, PlayerDefenceBoard);
+        if(Debug) drawBoard(62, 7, ComputerDefenceBoard);
 
         //Ask the player to place a ship
         message(NextShipText);
@@ -141,7 +152,7 @@ void placeComputerShips()
     while(placedShips < MaxShips)
     {
         //Choose a random number between 0 and 63
-        int pos = random.Next(63);
+        int pos = random.Next(Height * Width - 1);
 
         //Choose an orientations
         String orientation = Vertical; //default
@@ -160,7 +171,7 @@ void placeComputerShips()
             //okay - we can use this position
             placeShip(ComputerDefenceBoard, pos, AvailableShips[placedShips], orientation);
 
-            //Add the new ship to the PlayerShips array
+            //Add the new ship to the ComputerShips array
             addToComputerShips(placedShips, pos, AvailableShips[placedShips], orientation);
 
             //move onto the next ship
@@ -176,6 +187,7 @@ void startBattle()
     clear(6);
     message(PrepareForBattleText);
 
+    //This is the main loop for actually playing the game
     while(Winner == NoWinner)
     {
         move(CurrentPlayer);
@@ -201,6 +213,7 @@ void startBattle()
     //let this function end and the main loop will restart
 }
 
+// The player makes a move
 void move(int player)
 {
     int move = 0;
@@ -208,6 +221,8 @@ void move(int player)
     {
         //Draw the player's attacking board
         drawBoard(44, 7, PlayerAttackBoard);
+        if(Debug) drawBoard(62, 7, ComputerDefenceBoard);
+
         //Get the square from the player
         move = getPlayerMove();
         //Check to see if it has hit anything
@@ -222,16 +237,19 @@ void move(int player)
         //Change player
         CurrentPlayer = Computer;
     }
-    else
+    else //Computer
     {
         //Draw the computers's attacking board
         drawBoard(44, 7, ComputerAttackBoard);
+        if(Debug) drawBoard(62, 7, PlayerDefenceBoard);
+        
         //Generate a random move
         move = getComputerMove();
         //Check to see if it has hit anything
         resolveMove(PlayerDefenceBoard, ComputerAttackBoard, move);
-        //Check all the ships to see if anything is sunk
-        checkShips(PlayerDefenceBoard,PlayerShips);
+        //Check all the ships to see if anything is sunk. 
+        //Computer is attacking, so check the player's board and ships
+        checkShips(PlayerDefenceBoard, PlayerShips);
         //Update the board on screen with the new move
         drawBoard(44, 7, ComputerAttackBoard);
         //Change player
@@ -257,7 +275,7 @@ int getComputerMove()
 
     while(!isValid)
     {
-        pos = random.Next(63);
+        pos = random.Next(Height * Width -1);
         //Random, but check that we've not fired here already
         if(ComputerAttackBoard[pos] == Water)
         {
@@ -265,7 +283,7 @@ int getComputerMove()
         }
     }
 
-    //Make a string to show to the player
+    //Make a string to show to the player. We need to convert the integer pos back to a human reading coordinate.
     String mess = String.Format(ComputerAttacksText, Easting.ToCharArray()[pos % Width], Northing.ToCharArray()[pos / Width]);
     instruction(mess);
 
@@ -479,7 +497,7 @@ int coordToPosition(String coord)
     //We need to turn the easting and northing into integers
     String easting = coord.Substring(0, 1);
     //Use the position of the letter in the string to determine column (zero based)
-    int col = Easting.LastIndexOf(easting);
+    int col = Easting.IndexOf(easting);
 
     //Now convert the northing to an int, and subtract 1 to make it zero based as well
     String northing = coord.Substring(1, 1);
@@ -635,7 +653,7 @@ void load()
     String[] allShips = shipData.Split(shipSplitter); //Split on the + character
     for(int i=0; i<MaxShips; i++)
     {
-        PlayerShips[i] = allShips[i];
+        PlayerShips[i] = allShips[i*2];
         ComputerShips[i] = allShips[(i*2)+1]; // First iteration read 1, 2nd iteration read 3, 3rd read 5 etc.  Don't forget that i is zero based.
     }
 }
@@ -695,7 +713,6 @@ String getOrientation()
 
 String getInput(String text, string validKeys)
 {
-    //Clear the line first
     instruction(text);
 
     String key = "";
@@ -720,9 +737,9 @@ String readKey()
     return key.KeyChar.ToString().ToUpper();
 }
 
+//Get a valid menu selection from the user
 String getMenuOption()
 {
-    String validOptions = "SLQ";
     bool haveResponse = false;
     String response = "";
 
@@ -730,7 +747,7 @@ String getMenuOption()
     {
         response = readKey();
 
-        if(validOptions.Contains(response))
+        if(MenuOptions.Contains(response))
         {
             haveResponse = true;
         }
@@ -749,6 +766,14 @@ void init()
     centre(4, "| |_) | (_| | |_| |_| |  __/ | |_) | (_) | (_| | |_ ");
     centre(5, "|____/ \\__,_|\\__|\\__|_|\\___| |____/ \\___/ \\__,_|\\__|");
     Console.Beep();
+    if(Debug)
+    {
+        writeAt(3, 38, DebugModeText);
+    }
+    else
+    { 
+        writeAt(3, 38, ClearText);
+    }
 }
 
 //Set all of the squares in all of the boards to be open water, ready for a new game
@@ -776,10 +801,10 @@ void reset()
 void menu()
 {
     //Display the options to the user
-    centre(8, "Select an option from the menu");
-    centre(10, "S - start a new game");
-    centre(12, "L - load a saved game");
-    centre(14, "Q - quit");
+    centre(8, MenuTitleText);
+    centre(10, NewGameText);
+    centre(12, LoadGameText);
+    centre(14, QuitText);
 }
 
 
@@ -848,7 +873,8 @@ void instruction(String text)
 //Clear the console window from the start row
 void clear(int startRow)
 {
-    for(int row = startRow; row < Console.BufferHeight; row++)
+    //Never clear the last row - it might have the debug messge
+    for(int row = startRow; row < Console.BufferHeight -1; row++)
     {
         for(int col = 0; col < Console.BufferWidth; col++)
         {
@@ -872,9 +898,9 @@ while(!quit)
     switch(option)
     {
         case "S":
-            //New game
-            placePlayerShips();
+            //New 
             placeComputerShips();
+            placePlayerShips();
             startBattle();
             break;
         case "L":
@@ -882,6 +908,10 @@ while(!quit)
             load();
             startBattle();
             break;  
+        case "D":
+            //Hidden debug mode!
+            Debug = !Debug;
+            break;
         case "Q":
             //Quit
             quit = true;
